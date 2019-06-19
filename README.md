@@ -4,7 +4,7 @@ A KSP SFS savefile parser
 
 ## Install
 
-`pip3 install sfutils`
+`pip3 install sfsutils`
 
 ## Usage
 
