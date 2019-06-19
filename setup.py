@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="sfsutils",
-    version="0.0.1",
+    version="0.0.2",
     author="mark9064",
     description="A KSP SFS savefile parser",
     long_description=LONG_DESCRIPTION,
