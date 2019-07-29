@@ -1,8 +1,5 @@
 """Parser for KSP save file"""
-import copy
-import collections
-
-#FIXME capitalisation / stops
+from collections import OrderedDict
 
 def parse_savefile(sfs, sfs_is_path=True):
     """Parses an SFS file
@@ -56,48 +53,44 @@ def parse_savefile(sfs, sfs_is_path=True):
         data = sfs
     # removes all tabs
     data = data.replace("\t", "")
-    reading_val = False
     # in_nodes tracks the location of data being parsed (what nodes the parser is inside)
     in_nodes = []
-    out_dict = collections.OrderedDict()
-    key_read = ""
-    value_read = ""
+    out_dict = OrderedDict()
+    # key_read contains the start and end index of the key being read
+    key_read = [0, None]
+    # value_read contains the start index of the value being read
+    value_read = None
+    trigger = set(("\n", "}", "="))
     for index, char in enumerate(data):
-        if char == "\n":
-            # if the key is empty, continue
-            if not key_read:
-                continue
-            # if next char is an open bracket, save it as a new node
-            if data[index + 1] == "{":
-                in_nodes.append(key_read)
-                write_list = copy.deepcopy(in_nodes)
-                write_list.append(collections.OrderedDict())
-            # else it is a value in an existing node
+        # check if the char is one of the chars which leads to an action
+        # this is an optimisation only
+        if char in trigger:
+            if char == "\n":
+                # if the key is empty, continue
+                if key_read[0] == index - 1:
+                    pass
+                # if next char is an open bracket, save it as a new node
+                else:
+                    if data[index + 1] == "{":
+                        in_nodes.append(data[key_read[0]: index])
+                        write_list = in_nodes[:]
+                        write_list.append(OrderedDict())
+                    # else it is a value in an existing node
+                    else:
+                        write_list = in_nodes[:]
+                        write_list.append(data[key_read[0]: key_read[1]])
+                        write_list.append(data[value_read: index])
+                    set_value(out_dict, write_list)
+                key_read = [index + 1, None]
+            # pop the end of the 'stack' used to track attribute location
+            # when the end of a node is found
+            elif char == "}":
+                in_nodes.pop()
+            # set the end index of the key and start index of the value
+            # due to the set check (with 'trigger'), the char must be =
             else:
-                # discard trailing space from key and leading space from value
-                key_read = key_read[:-1]
-                value_read = value_read[1:]
-                write_list = copy.deepcopy(in_nodes)
-                write_list.append(key_read)
-                write_list.append(value_read)
-            set_value(out_dict, write_list)
-            key_read = ""
-            value_read = ""
-            reading_val = False
-        # pop the end of the 'stack' used to track attribute location
-        # when the end of a node is found
-        elif char == "}":
-            in_nodes.pop()
-        # ignore opening brackets as these are handled in the newline section
-        elif char == "{":
-            pass
-        # set the data to go to the value section rather than key
-        elif char == "=":
-            reading_val = True
-        elif reading_val:
-            value_read += char
-        else:
-            key_read += char
+                key_read[1] = index - 1
+                value_read = index + 2
     return out_dict
 
 def set_value(dict_nested, address_list):
@@ -122,10 +115,7 @@ def set_value(dict_nested, address_list):
             current[address_list[-2]].append(address_list[-1])
         # else convert the existing dict to a list
         else:
-            existing_value = current[address_list[-2]]
-            current[address_list[-2]] = []
-            current[address_list[-2]].append(existing_value)
-            current[address_list[-2]].append(address_list[-1])
+            current[address_list[-2]] = [current[address_list[-2]], address_list[-1]]
     # if it doesn't exist
     else:
         # guaranteed to be a dict thanks to earlier list check, so insert the key into the dict
@@ -206,4 +196,3 @@ def write_new_node(indents, sect_name, value):
 def write_value_to_node(indents, key, value):
     """Writes a key value pair into a node"""
     return "{0}{1} = {2}\n".format("\t" * indents, key, value)
-
