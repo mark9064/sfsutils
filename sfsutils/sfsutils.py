@@ -207,10 +207,3 @@ def write_value_to_node(indents, key, value):
     """Writes a key value pair into a node"""
     return "{0}{1} = {2}\n".format("\t" * indents, key, value)
 
-
-if __name__ == "__main__":
-    print("Parsing...")
-    DATA = parse_savefile("persistent.sfs")
-    print("Parse done, writing data out...")
-    writeout_savefile(DATA, "test.sfs")
-    print("Done")
