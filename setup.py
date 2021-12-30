@@ -12,7 +12,7 @@ with open("README.md", "r") as fh:
 
 setup_args = dict(
     name="sfsutils",
-    version="1.0.0",
+    version="1.1.0",
     author="mark9064",
     description="A KSP SFS savefile parser",
     long_description=LONG_DESCRIPTION,
