@@ -1,10 +1,9 @@
 """Parser for KSP save file"""
-from typing import Any, Dict, List, Optional, Union
 
-BACKEND = "Python"
+BACKEND = "Cython"
 
 
-def parse_savefile(sfs: str, sfs_is_path: bool = True) -> Dict[str, Any]:
+cpdef dict parse_savefile(str sfs, bint sfs_is_path=True):
     """Parses an SFS file
 
     Params:
@@ -50,6 +49,16 @@ def parse_savefile(sfs: str, sfs_is_path: bool = True) -> Dict[str, Any]:
             }
         }
     """
+    cdef:
+        object file
+        str data
+        list in_nodes
+        dict out_dict
+        long key_read
+        long value_read
+        long index
+        Py_UCS4 char
+        list write_list
     if sfs_is_path:
         with open(sfs, "r") as file:
             data = file.read()
@@ -59,46 +68,45 @@ def parse_savefile(sfs: str, sfs_is_path: bool = True) -> Dict[str, Any]:
     data = data.replace("\t", "").replace("\n ", "\n").replace(" = ", "=")
     # in_nodes tracks the location of data being parsed (what nodes the parser is inside)
     in_nodes = []
-    out_dict: Dict = {}
+    out_dict = {}
     # key_read contains the start index of the key being read
     key_read = 0
     # value_read contains the start index of the value being read
     value_read = 0
     for index, char in enumerate(data):
-        # check if the char is one of the chars which leads to an action
-        # this is an optimisation only
-        if char in {"\n", "}", "="}:
-            if char == "\n":
-                # if the last character wasn't a bracket, we have a node
-                if data[index - 1] not in {"{", "}"}:
-                    # if next char is an open bracket, save it as a new node
-                    if data[index + 1] == "{":
-                        in_nodes.append(data[key_read:index])
-                        set_value(out_dict, in_nodes, {})
-                    # else it is a value in an existing node
-                    else:
-                        write_list = in_nodes[:]
-                        # use value_read - 1 as the endpoint as the key must end 2 chars before the value starts
-                        write_list.append(data[key_read : value_read - 1])
-                        set_value(out_dict, write_list, data[value_read:index])
-                # read the key from the beginning of the next line
-                key_read = index + 1
-            # pop the end of the 'stack' used to track attribute location
-            # when the end of a node is found
-            elif char == "}":
-                in_nodes.pop()
-            # due to the set check, the char must be =
-            # set the start index of the value (the end index of the key must be one less than this)
-            else:
-                value_read = index + 1
+        if char == "\n":
+            # if the last character wasn't a bracket, we have a node
+            if data[index - 1] not in {"{", "}"}:
+                # if next char is an open bracket, save it as a new node
+                if data[index + 1] == "{":
+                    in_nodes.append(data[key_read : index])
+                    set_value(out_dict, in_nodes, {})
+                # else it is a value in an existing node
+                else:
+                    write_list = in_nodes[:]
+                    # use value_read - 1 as the endpoint as the key must end 2 chars before the value starts
+                    write_list.append(data[key_read : value_read - 1])
+                    set_value(out_dict, write_list, data[value_read:index])
+            # read the key from the beginning of the next line
+            key_read = index + 1
+        # pop the end of the 'stack' used to track attribute location
+        # when the end of a node is found
+        elif char == "}":
+            in_nodes.pop()
+        # due to the set check, the char must be =
+        # set the start index of the value (the end index of the key must be one less than this)
+        elif char == "=":
+            value_read = index + 1
     return out_dict
 
 
-def set_value(
-    dict_nested: Dict, address_list: List[str], value: Union[str, Dict]
-) -> None:
+cdef inline void set_value(dict dict_nested, list address_list, object value):
     """Sets a value in a nested dict
     WARNING - modifies the dictionary passed as an arg"""
+    cdef:
+        object current
+        str path_item
+        str prev_node
     # references the main dict
     current = dict_nested
     # locate the desired node to write to through iterating through the keys
@@ -126,9 +134,7 @@ def set_value(
         current[prev_node] = value
 
 
-def writeout_savefile(
-    parsed_data: Dict, destination_file: Optional[str] = None
-) -> Optional[str]:
+cpdef str writeout_savefile(dict parsed_data, str destination_file=None):
     """Writes out the parsed data back into the SFS format
 
     Params:
@@ -144,7 +150,11 @@ def writeout_savefile(
         the data is not modified. All abnormalities of the SFS format are addressed and
         represented correctly.
     """
-    out_data: List[str] = []
+    cdef:
+        str out_str
+        list out_data
+        object file
+    out_data = []
     serialise_data(parsed_data, out_data, -1)
     out_str = "".join(out_data)
     if not destination_file:
@@ -154,8 +164,16 @@ def writeout_savefile(
     return None
 
 
-def serialise_data(obj: Union[List, Dict], out_data: List[str], indents: int) -> None:
+cdef void serialise_data(object obj, list out_data, int indents):
     """Recursively serialises data"""
+    cdef:
+        str indent_str
+        list buffer_list
+        dict item
+        str key
+        object value
+        str res
+        dict subdict
     # indent upon each recurse
     indents += 1
     indent_str = "\t" * indents
@@ -187,13 +205,13 @@ def serialise_data(obj: Union[List, Dict], out_data: List[str], indents: int) ->
                         write_new_node(out_data, indent_str, indents, key, subdict)
 
 
-def write_new_node(
-    out_data: List[str],
-    indent_str: str,
-    indents: int,
-    sect_name: str,
-    value: Union[List, Dict],
-) -> None:
+cdef inline void write_new_node(
+    list out_data,
+    str indent_str,
+    int indents,
+    str sect_name,
+    object value,
+):
     """Write a new node to the SFS"""
     # adds the header
     out_data.extend((indent_str, sect_name, "\n", indent_str, "{\n"))

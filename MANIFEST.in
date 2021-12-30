@@ -1,0 +1,2 @@
+recursive-include sfsutils *.pyx
+recursive-exclude sfsutils *.c
