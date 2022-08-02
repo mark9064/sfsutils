@@ -19,6 +19,7 @@ setup_args = dict(
     long_description_content_type="text/markdown",
     url="https://github.com/mark9064/sfsutils",
     packages=setuptools.find_packages(),
+    python_requires='>=3.7',
     install_requires=[],
     zip_safe=False,
     classifiers=[
