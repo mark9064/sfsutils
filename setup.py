@@ -34,7 +34,7 @@ setup_args = dict(
 if USE_CYTHON:
     setup_args_cython = setup_args.copy()
     setup_args_cython["ext_modules"] = cythonize(
-        [setuptools.Extension(name="sfsutils.sfsutils", sources=["sfsutils/sfsutils.pyx"])],
+        [setuptools.Extension(name="sfsutils._sfsutils", sources=["sfsutils/_sfsutils.pyx"])],
         language_level=3,
     )
     try:
